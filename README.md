@@ -1,4 +1,4 @@
-# Climping Pyramid Visualizer
+# Climbing Pyramid Visualizer
 
 ![demo pyramid](demo.png)
 
@@ -14,12 +14,17 @@ In addition, you will need to install the following packages:
 
 All of which can be installed via `pip`.
 
+```
+mamba create -n climb python=3.11 pandas plotly dash
+```
+
 ## To run
 
-Ensure the file `app.py` is executable:
+To run the app, simply run the following command in the terminal:
 
 ```
-chmod +x app.py
+HOST=localhost
+python app.py
 ```
 
 Then simply run the app via the terminal with `./app.py` (you will need to copy/paste the URL into a web browser).
