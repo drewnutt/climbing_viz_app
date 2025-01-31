@@ -9,11 +9,10 @@ import io
 from data_cleaning import handle_roped, handle_boulders
 from grades import GRADES
 
-def generate_pyramid(ticks_data,route_type, rope_type, criteria_send, start_date, end_date,
+def generate_pyramid(ticks,route_type, rope_type, criteria_send, start_date, end_date,
                      criteria_max, criteria_multi, criteria_boulder):
-    if ticks_data is None:
+    if ticks is None:
         return go.Figure()
-    ticks = pd.read_json(io.StringIO(ticks_data), orient='split')
     # Filter the dataframe based on criteria
     if route_type == "Rope":
         ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
@@ -64,11 +63,10 @@ def generate_pyramid(ticks_data,route_type, rope_type, criteria_send, start_date
 
     return fig
 
-def generate_scatter(ticks_data,route_type, rope_type, criteria_send, start_date, end_date,
+def generate_scatter(ticks,route_type, rope_type, criteria_send, start_date, end_date,
                      criteria_max, criteria_multi, criteria_boulder):
-    if ticks_data is None:
+    if ticks is None:
         return go.Figure()
-    ticks = pd.read_json(io.StringIO(ticks_data), orient='split')
     # Filter the dataframe based on criteria
     if route_type == "Rope":
         ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
@@ -76,12 +74,22 @@ def generate_scatter(ticks_data,route_type, rope_type, criteria_send, start_date
         ticktext = [value for key,value in GRADES.items() if value.startswith('5') and key <= criteria_max]
         label = 'YDS'
         style = 'Lead Style'
+        checkstring = '5'
     else:
         ticks = handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder)
-        tickvals = [key for key,value in GRADES.items() if value.startswith('V') and key <= criteria_max]
-        ticktext = [value for key,value in GRADES.items() if value.startswith('V') and key <= criteria_max]
+        checkstring = 'V'
         label = 'V-Scale'
         style = 'Style'
+
+    tickvals, ticktext = [], []
+    for key,value in GRADES.items():
+        if value.startswith(checkstring) and key <= criteria_max:
+            if '-' in value or '+' in value:
+                continue
+            if 'b' in value or 'd' in value:
+                continue
+            tickvals.append(key)
+            ticktext.append(value)
 
     # Create a chart based on the filtered dataframe
     fig = px.scatter(ticks, x='Date', y='Rating Code', color=style,
