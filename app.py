@@ -9,25 +9,14 @@ from datetime import date
 import pandas as pd
 import base64
 import io
+from grades import GRADES
+from figures import generate_pyramid, generate_scatter
 
 
 if os.getenv('HOST'):
     del os.environ['HOST']
 
-# constant for grade/code conversion
-GRADES = {1700: "5.easy",1900: "5.7", 2200: "5.8",2500: "5.9",
-          2800: "5.10a",3100: "5.10b", 3400: "5.10c",4500: "5.10d",
-          4800: "5.11a",5100: "5.11b", 5400: "5.11c",6500: "5.11d",
-          6800: "5.12a",7100: "5.12b", 7400: "5.12c",8500: "5.12d",
-          8800: "5.13a",9100: "5.13b", 9400: "5.13c",10400: "5.13d"}
-BOULDER_GRADES = {20000 + 100 * i: f"V{i}" for i in range(1,18)} | \
-            {20000 + 100 * i - 30: f"V{i}-" for i in range(2,18)}  | {20000 + 100 * i + 10:f"V{i}+" for i in range(1,17)} | \
-            {20000 + 100 * i + 50: f"V{i}-{i+1}" for i in range(2,17)}  
-BOULDER_GRADES = BOULDER_GRADES | {20000: "V-easy", 20005: "V0-", 20010: "V0+", 20008: "V0"}
-# sort the boulder grades by value
-BOULDER_GRADES = dict(sorted(BOULDER_GRADES.items(), key=lambda x: x[0]))
 
-# generate BOULDER_GRADES 
 # Plotly configuration
 config = {'displayModeBar': False}
 
@@ -75,7 +64,7 @@ app.layout = html.Div([
                  max_date_allowed=date(2025, 1, 1), start_date=date(2022, 1, 1), end_date=date.today(),
                  id='date-range', style={'width':'75vw'}),
     html.Div(children=['Max Grade:',
-        dcc.Dropdown(options=[{'label': value, 'value': key} for key,value in GRADES.items()], value=8500, id='max-dropdown',
+        dcc.Dropdown(options=[{'label': value, 'value': key} for key,value in GRADES.items() if value.startswith('5')], value=8500, id='max-dropdown',
                                     searchable=False, clearable=False)],
             style={'width':'30vw'}),
     html.Div(children=[dcc.Checklist(['Include Multipitch Routes'],['Include Multipitch Routes'],
@@ -87,10 +76,13 @@ app.layout = html.Div([
         dcc.Tab(label='Pyramid', value="tab-pyramid"),
         dcc.Tab(label='Scatter', value="tab-scatter"),
     ], id='tabs', value='tab-pyramid'),
-    html.Div(id='tabs-content-graph', style={'width':'75vw'}, children=[dcc.Graph(figure=go.Figure(), config=config, id='graph-display')]),
-    dcc.Store(id='ticks-data-store'),
+    html.Div(id='tabs-content-graph', style={'width':'75vw'}, children=[dcc.Graph(figure=go.Figure(), config=config, id='graph-display')]),# ,dcc.Checklist(['Show Attempts'], ['Show Attempts'], id='attempts-filter')
+    # add a checkbox to toggle showing of attempts
+    dcc.Store(id='ticks-data-store', data=pd.read_csv('ticks.csv').to_json(date_format='iso', orient='split')),
     dcc.Store(id='tab-store', data='tab-pyramid')
 ])
+
+
 @app.callback(
         Output('max-dropdown', 'options'),
         Output('max-dropdown', 'value'),
@@ -100,51 +92,20 @@ app.layout = html.Div([
         Output('send-dropdown', 'options'),
         Output('send-dropdown', 'value'),
         [Input('route-type', 'value')],
+        State('ticks-data-store', 'data'),
         )
-def update_route_type(route_type):
+def update_route_type(route_type, ticks_data):
+    if ticks_data is None:
+        if route_type == 'Rope':
+            grade_options = [{'label': value, 'value': key} for key,value in GRADES.items() if value.startswith('5')]
+            max_grade = 8500
+        grade_options = [{'label': value, 'value': key} for key,value in GRADES.items() if value.startswith('V')]
+        max_grade = 20800
+    grade_options, max_grade = update_send_dropdown(ticks_data, route_type)
     if route_type == 'Rope':
-        grades = [{'label': value, 'value': key} for key,value in GRADES.items()]
-        return grades, 8500, False, True, False, ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Flash', 'Redpoint']
-    elif route_type == 'Boulder':
-        boulder_grades = [{'label': value, 'value': key} for key,value in BOULDER_GRADES.items()]
-        return boulder_grades, 20800, True, False, True, ['Send', 'Attempt','Flash'], ['Send','Flash']
+        return grade_options, max_grade, False, True, False, ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Flash', 'Redpoint']
+    return grade_options, max_grade, True, False, True, ['Send', 'Attempt','Flash'], ['Send','Flash']
 
-def handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi):
-    ticks = ticks.loc[ticks['Route Type'].isin(rope_type), :]
-    if start_date is not None:
-        ticks = ticks.loc[ticks['Date'] >= pd.to_datetime(start_date), :]
-    if end_date is not None:
-        ticks = ticks.loc[ticks['Date'] <= pd.to_datetime(end_date), :]
-    if 'N/A' in criteria_send:
-        ticks = ticks.loc[ticks['Lead Style'].isna() | ticks['Lead Style'].isin(criteria_send), :]
-    else:
-        ticks = ticks.loc[ticks['Lead Style'].isin(criteria_send), :]
-    if criteria_multi == []:
-        ticks = ticks.loc[ticks['Pitches']==1, :]
-    ticks = ticks.loc[ticks['Rating Code']<= criteria_max, :]
-
-    # Calculate climbing pyramid metrics
-    ticks['Grade'] = pd.cut(
-        ticks['Rating Code'],
-        bins=[0] + [key for key in GRADES.keys() if key <= criteria_max],
-        labels=[value for key, value in GRADES.items() if key <= criteria_max])
-    return ticks
-
-def handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder):
-    ticks = ticks.loc[ticks['Style'].isin(criteria_send)]
-    if start_date is not None:
-        ticks = ticks.loc[ticks['Date'] >= pd.to_datetime(start_date), :]
-    if end_date is not None:
-        ticks = ticks.loc[ticks['Date'] <= pd.to_datetime(end_date), :]
-    ticks = ticks.loc[ticks['Rating Code'] <= criteria_max, :]
-    ticks['Grade'] = pd.cut(
-        ticks['Rating Code'],
-        bins=[0] + [key for key in BOULDER_GRADES.keys() if key <= criteria_max],
-        labels=[value for key, value in BOULDER_GRADES.items() if key <= criteria_max])
-    if criteria_boulder:
-        ticks['Grade'] = ticks['Grade'].apply(lambda x: x.replace('-', '').replace('+', '') if x != 'V-easy' else x)
-
-    return ticks
 
 
 @app.callback(Output('tab-store', 'data'),
@@ -152,6 +113,24 @@ def handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, cr
               prevent_initial_call=True)
 def update_tab(tab):
     return tab
+
+@app.callback(
+    Output('max-dropdown', 'options', allow_duplicate=True),
+    Output('max-dropdown', 'value', allow_duplicate=True),
+    [Input('ticks-data-store', 'data')],
+    State('route-type', 'value'),
+    prevent_initial_call=True)
+def update_send_dropdown(ticks_data, route_type):
+    # find the max 'Rating Code' from the ticks data
+    data = pd.read_json(io.StringIO(ticks_data), orient='split')
+    if route_type == 'Rope':
+        # the max grade is the highest value in the 'Rating Code' column that is less than 20000
+        max_grade = data['Rating Code'][data['Rating Code'] < 20000].max()
+        grades = [{'label': value, 'value': key} for key,value in GRADES.items() if value.startswith('5') and key <= max_grade]
+        return grades, max_grade
+    max_grade = data['Rating Code'][(data['Rating Code'] < 30000) & (data['Rating Code'] >= 20000)].max()
+    boulder_grades = [{'label': value, 'value': key} for key,value in GRADES.items() if value.startswith('V') and key <= max_grade]
+    return boulder_grades, max_grade
 
 @app.callback(
         Output('graph-display', 'figure'),
@@ -176,63 +155,6 @@ def render_graphs(tab, ticks_data, route_type, rope_type, criteria_send, start_d
         scatter = generate_scatter(ticks_data, route_type, rope_type, criteria_send, start_date, end_date,
                        criteria_max, criteria_multi, criteria_boulder)
         return scatter
-
-# @app.callback(
-#         Output('graph-pyramid', 'figure', allow_duplicate=True),
-#         [Input('ticks-data-store', 'data'),
-#          Input('route-type', "value"),
-#          Input('rope-type', "value"),
-#          Input('send-dropdown', "value"),
-#          Input('date-range', "start_date"),
-#          Input('date-range', "end_date"),
-#          Input('max-dropdown', "value"),
-#          Input('multi-filter', "value"),
-#          Input('boulder-filter', "value"),],
-#          prevent_initial_call=True)
-def generate_pyramid(ticks_data,route_type, rope_type, criteria_send, start_date, end_date,
-                   criteria_max, criteria_multi, criteria_boulder):
-    if ticks_data is None:
-        return go.Figure()
-    ticks = pd.read_json(io.StringIO(ticks_data), orient='split')
-    # Filter the dataframe based on criteria
-    if route_type == "Rope":
-        ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
-    else:
-        ticks = handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder)
-    counts = ticks.groupby('Grade', observed=False)['URL'].nunique().reset_index()
-    counts.columns = ['Grade', 'Routes']
-    counts.sort_values(by='Grade', ascending=False, inplace=True)
-
-    # Create a chart based on the filtered dataframe
-    fig = px.funnel(counts, x='Routes', y='Grade', width=800, height=600)
-
-    return fig
-
-def generate_scatter(ticks_data,route_type, rope_type, criteria_send, start_date, end_date,
-                   criteria_max, criteria_multi, criteria_boulder):
-    if ticks_data is None:
-        return go.Figure()
-    ticks = pd.read_json(io.StringIO(ticks_data), orient='split')
-    # Filter the dataframe based on criteria
-    if route_type == "Rope":
-        ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
-        tickvals = [key for key,value in GRADES.items() if value in ['5.8','5.9','5,10a','5.11a','5.12a','5.13a'] and key <= criteria_max]
-        ticktext = [value for key,value in GRADES.items() if value in ['5.8','5.9','5,10a','5.11a','5.12a','5.13a'] and key <= criteria_max]
-        label = 'YDS'
-        style = 'Lead Style'
-    else:
-        ticks = handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder)
-        tickvals = [key for key,value in BOULDER_GRADES.items() if value in ['V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16'] and key <= criteria_max]
-        ticktext = [value for key,value in BOULDER_GRADES.items() if value in ['V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12','V13','V14','V15','V16'] and key <= criteria_max]
-        label = 'V-Scale'
-        style = 'Style'
-
-    # Create a chart based on the filtered dataframe
-    fig = px.scatter(ticks, x='Date', y='Rating Code', color=style, hover_data=['Route'],
-            width=1000, height=600)
-    fig.update_yaxes(tickvals=tickvals, ticktext=ticktext, title=label)
-
-    return fig
 
 
 @app.callback(
@@ -259,6 +181,7 @@ def mp_update_output(n_clicks, mp_url):
     decoded = io.StringIO(page.text)
     downloaded_ticks = pd.read_csv(decoded, parse_dates=['Date'])
     return downloaded_ticks.to_json(date_format='iso', orient='split')
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
