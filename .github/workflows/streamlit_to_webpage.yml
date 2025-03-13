@@ -28,7 +28,7 @@ jobs:
             - name: 📦 Upload Pages Artifact
               uses: actions/upload-pages-artifact@v3
               with:
-                  path: index.html
+                  path: gh_pages
 
     deploy:
         needs: build

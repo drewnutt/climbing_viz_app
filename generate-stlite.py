@@ -1,8 +1,13 @@
+import os
+
 files=['app.py','grades.py','figures.py','data_cleaning.py'] # files to be included in the index.html
 requirements = ['plotly','requests'] # python packages to be installed
 entrypoint = files[0] # entrypoint file, must be in the files list
 
-with open('index.html', 'w') as f:
+# create gh_pages directory
+os.makedirs('gh_pages', exist_ok=True)
+
+with open('gh_pages/index.html', 'w') as f:
     header = '''
 <html>
   <head>
