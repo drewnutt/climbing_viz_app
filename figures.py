@@ -4,8 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-import statsmodels.api as sm
 import io
+import statsmodels.api as sm
 from data_cleaning import handle_roped, handle_boulders
 from grades import GRADES
 
@@ -14,7 +14,7 @@ def generate_pyramid(ticks,route_type, rope_type, criteria_send, start_date, end
     if ticks is None:
         return go.Figure()
     # Filter the dataframe based on criteria
-    if route_type == "Rope":
+    if route_type == "Roped":
         ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
         send = ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint']
         attempt = ['Fell/Hung', 'N/A']
@@ -68,7 +68,7 @@ def generate_scatter(ticks,route_type, rope_type, criteria_send, start_date, end
     if ticks is None:
         return go.Figure()
     # Filter the dataframe based on criteria
-    if route_type == "Rope":
+    if route_type == "Roped":
         ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
         tickvals = [key for key,value in GRADES.items() if value.startswith('5') and key <= criteria_max]
         ticktext = [value for key,value in GRADES.items() if value.startswith('5') and key <= criteria_max]
@@ -94,7 +94,7 @@ def generate_scatter(ticks,route_type, rope_type, criteria_send, start_date, end
     # Create a chart based on the filtered dataframe
     fig = px.scatter(ticks, x='Date', y='Rating Code', color=style,
             hover_data={'Route':True, 'Rating Code':False, 'Grade':True, 'Date':True},
-            symbol=None if route_type != 'Rope' else 'Route Type',
+            symbol=None if route_type != 'Roped' else 'Route Type',
             # add trendline
             trendline="ols", trendline_color_override='dark blue',
             width=1000, height=600)
