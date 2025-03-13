@@ -2,7 +2,7 @@ name: Streamlit to stlite Webpage
 on:
     push:
         branches:
-            - streamlit
+            - main
 jobs:
     build:
         runs-on: ubuntu-latest
