@@ -1,0 +1,49 @@
+name: Streamlit to stlite Webpage
+on:
+    push:
+        branches:
+            - streamlit
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            # ... checkout and install dependencies
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: 3.11
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install plotly pandas streamlit
+
+            - name: 📄 Export notebook
+              run: |
+                  python generate-stlite.py
+
+            - name: 📦 Upload Pages Artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: gh_pages
+
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+
+        permissions:
+            pages: write
+            id-token: write
+
+        steps:
+            - name: 🌐 Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
+              with:
+                  artifact_name: github-pages

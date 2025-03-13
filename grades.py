@@ -293,3 +293,4 @@ GRADES = {
 }
 
     
+REVERSE_GRADES = {value:key for key,value in GRADES.items()}
