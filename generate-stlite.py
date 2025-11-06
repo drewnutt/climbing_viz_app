@@ -18,15 +18,11 @@ with open('gh_pages/index.html', 'w') as f:
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
     <title>Stlite app</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.1/build/style.css"
-    />
   </head>
   <body>
     <div id="root"></div>
     <script type="module">
-import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.1/build/stlite.js"
+import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.89.1/build/stlite.js"
 mount(
   {
     requirements: ''' + str(requirements) + ''',

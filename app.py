@@ -3,7 +3,6 @@ import io
 from datetime import date
 
 import streamlit as st
-import requests
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -11,6 +10,11 @@ import plotly.express as px
 from figures import generate_pyramid, generate_scatter
 from grades import GRADES, REVERSE_GRADES
 from data_cleaning import handle_roped, handle_boulders, handle_generic
+# from pyodide.http import pyxhr as requests
+# try:
+# except ImportError:
+# import requests
+
 
 grade_ranges = {
     'Roped': (0, 20000),
@@ -30,18 +34,19 @@ st.set_page_config(layout='wide')
 st.title('Mountain Project Visualization App')
 interface, graphs = st.columns([0.4,0.6])
 
-@st.cache_data
-def get_data(mp_url):
-    assert mp_url.startswith('https://www.mountainproject.com/user/'), f"Invalid URL:{mp_url}"
-    mp_url += '/tick-export'
-    page = requests.get(mp_url)
-    if page.ok:
-        assert page.status_code == 200, f"Invalid URL: {mp_url}"
-    decoded = io.StringIO(page.text)
-    downloaded_ticks = pd.read_csv(decoded, parse_dates=['Date'])
-    st.session_state.data = downloaded_ticks
-    st.session_state.downloaded = True
-    return downloaded_ticks
+# still doesn't work in pyodide
+# @st.cache_data
+# def get_data(mp_url):
+#     assert mp_url.startswith('https://www.mountainproject.com/user/'), f"Invalid URL:{mp_url}"
+#     mp_url += '/tick-export'
+#     page = requests.get(mp_url, headers={'Origin': 'null'})
+#     if page.ok:
+#         assert page.status_code == 200, f"Invalid URL: {mp_url}"
+#     decoded = io.StringIO(page.text)
+#     downloaded_ticks = pd.read_csv(decoded, parse_dates=['Date'])
+#     st.session_state.data = downloaded_ticks
+#     st.session_state.downloaded = True
+#     return downloaded_ticks
 
 @st.cache_data
 def csv_to_df(uploaded_file):
@@ -50,12 +55,13 @@ def csv_to_df(uploaded_file):
     return None
 with interface:
     # textbox for MP URL
-    mp_url = st.text_input('Enter the URL of the Mountain Project page you want to analyze:', placeholder='https://www.mountainproject.com/user/USRNUM/USER-NAME', key='url', help='Enter the URL of the Mountain Project user page you want to analyze.')
-    # # button to submit the URL
-    st.button('Submit', on_click=get_data, args=(mp_url,))
-    st.write('OR')
+    # mp_url = st.text_input('Enter the URL of the Mountain Project page you want to analyze:', placeholder='https://www.mountainproject.com/user/USRNUM/USER-NAME', key='url', help='Enter the URL of the Mountain Project user page you want to analyze.')
+    # # # button to submit the URL
+    # st.button('Submit', on_click=get_data, args=(mp_url,))
+    # st.write('OR')
 
     # create a file uploader for the user to upload their tick data
+    st.write('Download your tick data from Mountain Project and upload it here:')
     uploaded_file = st.file_uploader('Upload your tick data:', type=['csv'], key='file')
     st.session_state.data = csv_to_df(uploaded_file) if uploaded_file is not None else st.session_state.data
     data = st.session_state.data
@@ -151,11 +157,14 @@ with graphs:
     with data_tab:
         if len(st.session_state.ticks):
             display_df = st.session_state.ticks.copy()
-            # format the Date column to MM/DD/YYYY
-            # display_df['Date'] = display_df['Date'].dt.strftime('%m/%d/%Y')
             cols = ['Date','Route','Grade','Style','Notes','Location','Length', 'URL']
             if c_type != 'Roped':
                 cols += ['Pitches']
+            # format the Date column to MM/DD/YYYY
+            # display_df['Date'] = display_df['Date'].dt.strftime('%m/%d/%Y')
+            # st.write(display_df[cols])
+
+            # Can't use this with stlite yet
             st.dataframe(display_df, hide_index=True, column_order=cols,
                          column_config={
                              'Date': st.column_config.DateColumn('Date of Climb', format='MMM D YYYY', pinned=True),
