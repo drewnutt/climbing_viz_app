@@ -29,7 +29,7 @@ def generate_pyramid(ticks,route_type, rope_type, criteria_send, start_date, end
         # check the 'Style' column for the values in 'send' and 'attempt'
     send = [s for s in send if s in ticks['Style'].unique()]
     attempt = [a for a in attempt if a in ticks['Style'].unique()]
-    counts = ticks.groupby(['Grade','Style']).count().reset_index()
+    counts = ticks.groupby(['Grade','Style'], observed=False).count().reset_index()
     counts = counts[counts['Style'].isin(send + attempt)]
     counts = counts.pivot(index='Grade',columns='Style',values='Date').reset_index()
     # convert the counts to integers from objects

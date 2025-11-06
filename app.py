@@ -63,7 +63,7 @@ with interface:
     date_range = st.date_input('Date Range:', (start_date,end_date), min_value=start_date, max_value=end_date, key='date_range', on_change=csv_to_df, args=(uploaded_file,))
 
     # create a list of radio buttons for the user to select the climbing type
-    climbing_type = st.radio('Select Climbing Type:', ['Roped :knot::mountain:', 'Bouldering :rock:','Ice :ice_cube:','Mixed','Aid','Snow :snowflake:'], key='climbing_type', on_change=csv_to_df, args=(uploaded_file,))
+    climbing_type = st.radio('Select Climbing Type:', ['Roped :mount_fuji:', 'Bouldering','Ice','Mixed','Aid','Snow :snowflake:'], key='climbing_type', on_change=csv_to_df, args=(uploaded_file,))
     def update_send_dropdown(data, route_type):
         # find the max 'Rating Code' from the ticks data
         if route_type == 'Roped':
