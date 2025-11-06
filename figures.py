@@ -6,29 +6,37 @@ import pandas as pd
 import numpy as np
 import io
 import statsmodels.api as sm
-from data_cleaning import handle_roped, handle_boulders
 from grades import GRADES
 
-def generate_pyramid(ticks,route_type, rope_type, criteria_send, start_date, end_date,
-                     criteria_max, criteria_multi, criteria_boulder):
+def generate_pyramid(ticks, route_type, rope_type):
     if ticks is None:
         return go.Figure()
-    # Filter the dataframe based on criteria
-    if route_type == "Roped":
-        ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
-        send = ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint']
-        attempt = ['Fell/Hung', 'N/A']
-        tickvals=[f'5.{v}' for v in range(8,10)] + [f'5.{v}a' for v in range(10,16)]
-    else:
-        ticks = handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder)
-        # create a new column with only the numeric part of the grade
-        ticks['Grade'] = ticks['Grade'].apply(lambda x: 'V' + x.split()[0][1:])
-        send = ['Send', 'Flash']
-        attempt = ['Attempt']
-        tickvals=[f'V{v}' for v in range(0,17)]
-        # check the 'Style' column for the values in 'send' and 'attempt'
-    send = [s for s in send if s in ticks['Style'].unique()]
-    attempt = [a for a in attempt if a in ticks['Style'].unique()]
+    
+    # Define route type configurations
+    route_configs = {
+        'Roped': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
+                  'tickvals': [f'5.{v}' for v in range(8,10)] + [f'5.{v}a' for v in range(10,16)]},
+        'Bouldering': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+                       'tickvals': [f'V{v}' for v in range(0,17)], 'clean_grade': lambda x: 'V' + x.split()[0][1:]},
+        'Ice': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+                'tickvals': [f'WI{v}' for v in range(1,9)] + [f'AI{v}' for v in range(1,7)]},
+        'Mixed': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+                  'tickvals': [f'M{v}' for v in range(1,14)]},
+        'Aid': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+                'tickvals': [f'C{v}' for v in range(0,6)] + [f'A{v}' for v in range(0,6)]},
+        'Snow': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+                 'tickvals': ['Easy Snow', 'Mod. Snow', 'Steep Snow']}
+    }
+    config = route_configs[route_type]
+    
+    # Apply grade cleaning if specified
+    if route_type == 'Bouldering' and 'clean_grade' in config:
+        ticks['Grade'] = ticks['Grade'].apply(config['clean_grade'])
+    
+    send = [s for s in config['send'] if s in ticks['Style'].unique()]
+    attempt = [a for a in config['attempt'] if a in ticks['Style'].unique()]
+    tickvals = config['tickvals']
+    
     counts = ticks.groupby(['Grade','Style'], observed=False).count().reset_index()
     counts = counts[counts['Style'].isin(send + attempt)]
     counts = counts.pivot(index='Grade',columns='Style',values='Date').reset_index()
@@ -63,38 +71,48 @@ def generate_pyramid(ticks,route_type, rope_type, criteria_send, start_date, end
 
     return fig
 
-def generate_scatter(ticks,route_type, rope_type, criteria_send, start_date, end_date,
-                     criteria_max, criteria_multi, criteria_boulder):
-    if ticks is None:
+def generate_scatter(ticks,route_type, rope_type, criteria_max):
+    if ticks is None or len(ticks) == 0:
         return go.Figure()
-    # Filter the dataframe based on criteria
-    if route_type == "Roped":
-        ticks = handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi)
-        tickvals = [key for key,value in GRADES.items() if value.startswith('5') and key <= criteria_max]
-        ticktext = [value for key,value in GRADES.items() if value.startswith('5') and key <= criteria_max]
-        label = 'YDS'
-        style = 'Lead Style'
-        checkstring = '5'
-    else:
-        ticks = handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, criteria_boulder)
-        checkstring = 'V'
-        label = 'V-Scale'
-        style = 'Style'
+    
+    # Define route type configurations
+    route_configs = {
+        'Roped': {'checkstring': '5', 'label': 'YDS', 'style': 'Lead Style', 'use_route_type_symbol': True},
+        'Bouldering': {'checkstring': 'V', 'label': 'V-Scale', 'style': 'Style', 'use_route_type_symbol': False},
+        'Ice': {'checkstring': ('WI', 'AI'), 'label': 'Ice Grade', 'style': 'Style', 'use_route_type_symbol': False},
+        'Mixed': {'checkstring': 'M', 'label': 'Mixed Grade', 'style': 'Style', 'use_route_type_symbol': False},
+        'Aid': {'checkstring': ('C', 'A'), 'label': 'Aid Grade', 'style': 'Style', 'use_route_type_symbol': False},
+        'Snow': {'checkstring': ('Easy', 'Mod', 'Steep'), 'label': 'Snow Grade', 'style': 'Style', 'use_route_type_symbol': False}
+    }
+    config = route_configs[route_type]
+    
+    checkstring = config['checkstring']
+    label = config['label']
+    style = config['style']
 
     tickvals, ticktext = [], []
-    for key,value in GRADES.items():
-        if value.startswith(checkstring) and key <= criteria_max:
-            if '-' in value or '+' in value:
+    for key, value in GRADES.items():
+        if key > criteria_max:
+            continue
+        # Check if value starts with checkstring (handles both str and tuple)
+        if isinstance(checkstring, tuple):
+            if not any(value.startswith(c) for c in checkstring):
                 continue
-            if 'b' in value or 'd' in value:
+        else:
+            if not value.startswith(checkstring):
                 continue
-            tickvals.append(key)
-            ticktext.append(value)
+        # Skip intermediate grades
+        if '-' in value or '+' in value:
+            continue
+        if 'b' in value or 'd' in value:
+            continue
+        tickvals.append(key)
+        ticktext.append(value)
 
     # Create a chart based on the filtered dataframe
     fig = px.scatter(ticks, x='Date', y='Rating Code', color=style,
             hover_data={'Route':True, 'Rating Code':False, 'Grade':True, 'Date':True},
-            symbol=None if route_type != 'Roped' else 'Route Type',
+            symbol=None if not config['use_route_type_symbol'] else 'Route Type',
             # add trendline
             trendline="ols", trendline_color_override='dark blue',
             width=1000, height=600)

@@ -42,3 +42,14 @@ def handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, cr
         ticks['Grade'] = ticks['Grade'].apply(lambda x: 'V' + x.split('-')[0][1:].strip('+-'))
 
     return ticks
+
+def handle_generic(ticks, criteria_send, start_date, end_date, criteria_max, min_code, max_code):
+    ticks = ticks[(ticks['Rating Code'] >= min_code) & (ticks['Rating Code'] < max_code)]
+    ticks = ticks.loc[ticks['Style'].isin(criteria_send)]
+    ticks = filter_time(ticks, start_date, end_date)
+    ticks = ticks.loc[ticks['Rating Code'] <= criteria_max, :]
+    ticks['Grade'] = pd.cut(
+        ticks['Rating Code'],
+        bins=[0] + [key for key in GRADES.keys() if (key <= criteria_max) & (key >= min_code)],
+        labels=[value for key, value in GRADES.items() if (key <= criteria_max) & (key >= min_code)])
+    return ticks
