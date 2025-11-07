@@ -152,24 +152,26 @@ with graphs:
         st.write('No data available')
         st.stop()
     # generate tabs for the user to select the type of visualization
-    data_tab, pyramid_tab, scatter_tab = st.tabs(['Data','Pyramid','Scatter'])
+    pyramid_tab, scatter_tab, data_tab = st.tabs(['Pyramid','Scatter', 'Data'])
     with data_tab:
         if len(st.session_state.ticks):
             display_df = st.session_state.ticks.copy()
-            cols = ['Date','Route','Grade','Style','Notes','Location','Length', 'URL']
+            cols = ['Date','Route','Style','Notes','Location','Length', 'URL']
+            # ,'Grade'
             if c_type != 'Roped':
                 cols += ['Pitches']
             # format the Date column to MM/DD/YYYY
-            # display_df['Date'] = display_df['Date'].dt.strftime('%m/%d/%Y')
-            # st.write(display_df[cols])
+            display_df['Date'] = display_df['Date'].dt.strftime('%m/%d/%Y')
+            # write the types of each column
+            st.dataframe(display_df[cols])
 
             # Can't use this with stlite yet
-            st.dataframe(display_df, hide_index=True, column_order=cols,
-                         column_config={
-                             'Date': st.column_config.DateColumn('Date of Climb', format='MMM D YYYY', pinned=True),
-                             'Route': st.column_config.TextColumn('Route Name', pinned=True),
-                             'URL': st.column_config.LinkColumn('Mountain Project Link', display_text='MP Link'),
-                             })
+            # st.dataframe(display_df, hide_index=True, column_order=cols,
+            #              column_config={
+            #                  'Date': st.column_config.DateColumn('Date of Climb', format='MMM D YYYY', pinned=True),
+            #                  'Route': st.column_config.TextColumn('Route Name', pinned=True),
+            #                  'URL': st.column_config.LinkColumn('Mountain Project Link', display_text='MP Link'),
+            #                  })
 
     with scatter_tab:
         figure = generate_scatter(st.session_state.ticks, c_type, r_type, REVERSE_GRADES[st.session_state.criteria_max])

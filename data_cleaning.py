@@ -8,10 +8,21 @@ def filter_time(ticks, start_date, end_date):
         ticks = ticks.loc[ticks['Date'] <= pd.to_datetime(end_date), :]
     return ticks
 
+def clean_notes(ticks):
+    ticks['Notes'] = ticks['Notes'].fillna('')
+    # replace HTML ascii codes with normal characters, specifically &#39; to ' and &#34; to "
+    ticks['Notes'] = ticks['Notes'].str.replace('&#39;', "'", regex=False)
+    ticks['Notes'] = ticks['Notes'].str.replace('&#34;', '"', regex=False)
+    return ticks
+
 def handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria_max, criteria_multi):
     ticks = ticks[ticks['Rating Code'] < 20000]
+    if 'Sport, Boulder' in ticks['Route Type'].values:
+        ticks = ticks.replace({'Route Type': {'Sport, Boulder': 'Sport'}})
+        ticks = ticks.replace({'Lead Style': {'Attempt': 'Fell/Hung'}})
     ticks = ticks.loc[ticks['Route Type'].isin(rope_type), :]
     ticks = filter_time(ticks, start_date, end_date)
+    ticks = clean_notes(ticks)
     if 'N/A' in criteria_send:
         ticks = ticks.loc[ticks['Lead Style'].isna() | ticks['Lead Style'].isin(criteria_send), :]
     else:
@@ -33,6 +44,7 @@ def handle_boulders(ticks, criteria_send, start_date, end_date, criteria_max, cr
     ticks = ticks[(ticks['Rating Code'] >= 20000) & (ticks['Rating Code'] < 30000)]
     ticks = ticks.loc[ticks['Style'].isin(criteria_send)]
     ticks = filter_time(ticks, start_date, end_date)
+    ticks = clean_notes(ticks)
     ticks = ticks.loc[ticks['Rating Code'] <= criteria_max, :]
     ticks['Grade'] = pd.cut(
         ticks['Rating Code'],
@@ -47,6 +59,7 @@ def handle_generic(ticks, criteria_send, start_date, end_date, criteria_max, min
     ticks = ticks[(ticks['Rating Code'] >= min_code) & (ticks['Rating Code'] < max_code)]
     ticks = ticks.loc[ticks['Style'].isin(criteria_send)]
     ticks = filter_time(ticks, start_date, end_date)
+    ticks = clean_notes(ticks)
     ticks = ticks.loc[ticks['Rating Code'] <= criteria_max, :]
     ticks['Grade'] = pd.cut(
         ticks['Rating Code'],

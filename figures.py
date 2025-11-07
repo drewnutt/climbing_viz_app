@@ -17,7 +17,7 @@ def generate_pyramid(ticks, route_type, rope_type, remove_sent=False, remove_dup
         'Roped': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
                   'tickvals': [f'5.{v}' for v in range(8,10)] + [f'5.{v}a' for v in range(10,16)]},
         'Bouldering': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
-                       'tickvals': [f'V{v}' for v in range(0,17)], 'clean_grade': lambda x: 'V' + x.split()[0][1:]},
+                       'tickvals': ['V-easy'] + [f'V{v}' for v in range(0,17)]},
         'Ice': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['TR','Fell/Hung', 'N/A'],
                 'tickvals': [f'WI{v}' for v in range(1,9)] + [f'AI{v}' for v in range(1,7)]},
         'Mixed': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
@@ -29,21 +29,22 @@ def generate_pyramid(ticks, route_type, rope_type, remove_sent=False, remove_dup
     }
     config = route_configs[route_type]
     
-    # Apply grade cleaning if specified
-    if route_type == 'Bouldering' and 'clean_grade' in config:
-        ticks['Grade'] = ticks['Grade'].apply(config['clean_grade'])
-    
-    send = [s for s in config['send'] if s in ticks['Style'].unique()]
-    attempt = [a for a in config['attempt'] if a in ticks['Style'].unique()]
-    tickvals = config['tickvals']
-    
     # duplicate a row for each value in 'Pitches'
+    # seems to break things with sport climbs so just applying to bouldering for now
     def expand_pitches(row):
         if 'Pitches' in row and pd.notna(row['Pitches']) and row['Pitches'] > 1:
             return pd.DataFrame([row] * row['Pitches'])
         else:
             return pd.DataFrame([row])
-    ticks = pd.concat([expand_pitches(row) for _, row in ticks.iterrows()], ignore_index=True)
+    if route_type == 'Bouldering':
+        ticks = pd.concat([expand_pitches(row) for _, row in ticks.iterrows()], ignore_index=True)
+        
+
+    
+    send = [s for s in config['send'] if s in ticks['Style'].unique()]
+    attempt = [a for a in config['attempt'] if a in ticks['Style'].unique()]
+    tickvals = config['tickvals']
+    
 
     
     if remove_sent:
