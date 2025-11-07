@@ -64,7 +64,6 @@ with interface:
     st.write('Download your tick data from Mountain Project and upload it here:')
     uploaded_file = st.file_uploader('Upload your tick data:', type=['csv'], key='file')
     st.session_state.data = csv_to_df(uploaded_file) if uploaded_file is not None else st.session_state.data
-    data = st.session_state.data
 
     # if the button is clicked and the URL is not empty, then run get_data()
     # data = get_data(mp_url) if mp_url != 'https://www.mountainproject.com/user/USRNUM/USER-NAME' else None
@@ -75,12 +74,12 @@ with interface:
     def get_min_date(data):
         return data['Date'].min().date()
     if len(st.session_state.data):
-        start_date = get_min_date(data)
+        start_date = get_min_date(st.session_state.data)
     # create a date range selector from start_date to end_date
-    date_range = st.date_input('Date Range:', (start_date,end_date), min_value=start_date, max_value=end_date, key='date_range', on_change=csv_to_df, args=(uploaded_file,))
+    date_range = st.date_input('Date Range:', (start_date,end_date), min_value=start_date, max_value=end_date, key='date_range')
 
     # create a list of radio buttons for the user to select the climbing type
-    climbing_type = st.radio('Select Climbing Type:', ['Roped :mount_fuji:', 'Bouldering','Ice','Mixed','Aid','Snow :snowflake:'], key='climbing_type', on_change=csv_to_df, args=(uploaded_file,))
+    climbing_type = st.radio('Select Climbing Type:', ['Roped :mount_fuji:', 'Bouldering','Ice','Mixed','Aid','Snow :snowflake:'], key='climbing_type', args=(uploaded_file,))
     def update_send_dropdown(data, route_type):
         # find the max 'Rating Code' from the ticks data
         min_code, max_code = grade_ranges[route_type]
@@ -93,7 +92,7 @@ with interface:
         defaults = {
             'Roped': ('5', '5.12c', ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Flash', 'Redpoint','Fell/Hung']),
             'Bouldering': ('V', 'V9', ['Send', 'Attempt','Flash'], ['Send','Flash','Attempt']),
-            'Ice': (('WI', 'AI'), 'WI4', ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Redpoint', 'Flash']),
+            'Ice': (('WI', 'AI'), 'WI4', ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'TR','Fell/Hung', 'N/A'], ['Onsight', 'Redpoint', 'Flash','TR']),
             'Mixed': ('M', 'M6', ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Redpoint', 'Flash']),
             'Aid': (('C', 'A'), 'A2', ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Fell/Hung', 'N/A'], ['Onsight', 'Redpoint', 'Flash']),
             'Snow': (('Easy', 'Mod', 'Steep'), 'Mod. Snow', ['Send', 'Attempt','Flash'], ['Send','Flash','Attempt'])
@@ -109,38 +108,38 @@ with interface:
         else:
             grade_options, max_grade = update_send_dropdown(ticks_data, route_type)
         return grade_options, max_grade, send_opts, send_vals
-    if len(data):
-        grade_options, max_grade, send_options, send_value = update_route_type(climbing_type.split()[0], data)
+    if len(st.session_state.data):
+        grade_options, max_grade, send_options, send_value = update_route_type(climbing_type.split()[0], st.session_state.data)
     # based on the climbing_type selected, generate a pills list for the user to select the rope type
-        climb_type = st.pills('Select Rope Type', send_options, selection_mode='multi', key='climb_type', default=send_value, on_change=csv_to_df, args=(uploaded_file,))
+        climb_type = st.pills('Select Rope Type', send_options, selection_mode='multi', key='climb_type', default=send_value)
         # create a slider for the user to select the max grade
-        criteria_max = st.select_slider('Select Max Grade:', options=list(grade_options.keys()), key='criteria_max', value=max_grade, on_change=csv_to_df, args=(uploaded_file,))
+        criteria_max = st.select_slider('Select Max Grade:', options=list(grade_options.keys()), key='criteria_max', value=max_grade)
 
         c_type = climbing_type.split()[0]
         r_type, c_multi, c_boulder = [], False, False
         if c_type == 'Roped':
             # add another multi pills list for the user to select the type of roped climbing
-            rope_type = st.pills('Rope Type', ['Sport','Trad','TR'], selection_mode='multi', key='rope_type', default=['Sport'], on_change=csv_to_df, args=(uploaded_file,))
+            rope_type = st.pills('Rope Type', ['Sport','Trad','TR'], selection_mode='multi', key='rope_type', default=['Sport'])
             # add a checkbox for including multipitch climbs
-            criteria_multi = st.checkbox('Include Multipitch Climbs', key='criteria_multi', on_change=csv_to_df, args=(uploaded_file,))
+            criteria_multi = st.checkbox('Include Multipitch Climbs', key='criteria_multi')
             r_type = st.session_state.rope_type
             c_multi = st.session_state.criteria_multi
             c_boulder = False
         elif c_type == 'Bouldering':
             # add a checkbox for including boulder grades
-            criteria_boulder = st.checkbox('Combine -,+, and normal grades', key='criteria_boulder', on_change=csv_to_df, args=(uploaded_file,))
+            criteria_boulder = st.checkbox('Combine -,+, and normal grades', key='criteria_boulder')
             c_boulder = st.session_state.criteria_boulder
 
         # create a ticks dataframe based on the currently selected options
-        if len(data):
+        if len(st.session_state.data):
             handler = handle_generic
-            args = [data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], grade_ranges[c_type][0], grade_ranges[c_type][1]]
+            args = [st.session_state.data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], grade_ranges[c_type][0], grade_ranges[c_type][1]]
             if c_type == 'Roped':
                 handler = handle_roped
-                args = [st.session_state.rope_type, data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], st.session_state.criteria_multi]
+                args = [st.session_state.rope_type, st.session_state.data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], st.session_state.criteria_multi]
             elif c_type == 'Bouldering':
                 handler = handle_boulders
-                args = [data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], st.session_state.criteria_boulder]
+                args = [st.session_state.data, st.session_state.climb_type, st.session_state.date_range[0], st.session_state.date_range[1], REVERSE_GRADES[st.session_state.criteria_max], st.session_state.criteria_boulder]
             
 
             ticks = handler(*args)
@@ -149,7 +148,7 @@ with interface:
 
 # generate a pyramid based on the climbing type
 with graphs:
-    if not len(data):
+    if not len(st.session_state.data):
         st.write('No data available')
         st.stop()
     # generate tabs for the user to select the type of visualization
@@ -176,5 +175,11 @@ with graphs:
         figure = generate_scatter(st.session_state.ticks, c_type, r_type, REVERSE_GRADES[st.session_state.criteria_max])
         st.plotly_chart(figure, key='scatter')
     with pyramid_tab:
-        figure = generate_pyramid(st.session_state.ticks, c_type, r_type)
+        cb1, cb2 = st.columns([0.5,0.5])
+        with cb1:
+            st.checkbox('Remove sent routes from attempts', key='remove_sent')
+        with cb2:
+            st.checkbox('Remove duplicates', key='remove_duplicates')
+        figure = generate_pyramid(st.session_state.ticks, c_type, r_type,
+                                  remove_sent=st.session_state.remove_sent, remove_duplicates=st.session_state.remove_duplicates)
         st.plotly_chart(figure, key='pyramid')

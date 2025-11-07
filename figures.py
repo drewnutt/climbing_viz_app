@@ -8,8 +8,8 @@ import io
 import statsmodels.api as sm
 from grades import GRADES
 
-def generate_pyramid(ticks, route_type, rope_type):
-    if ticks is None:
+def generate_pyramid(ticks, route_type, rope_type, remove_sent=False, remove_duplicates=False):
+    if ticks is None or len(ticks) == 0:
         return go.Figure()
     
     # Define route type configurations
@@ -18,13 +18,13 @@ def generate_pyramid(ticks, route_type, rope_type):
                   'tickvals': [f'5.{v}' for v in range(8,10)] + [f'5.{v}a' for v in range(10,16)]},
         'Bouldering': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
                        'tickvals': [f'V{v}' for v in range(0,17)], 'clean_grade': lambda x: 'V' + x.split()[0][1:]},
-        'Ice': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+        'Ice': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['TR','Fell/Hung', 'N/A'],
                 'tickvals': [f'WI{v}' for v in range(1,9)] + [f'AI{v}' for v in range(1,7)]},
-        'Mixed': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+        'Mixed': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
                   'tickvals': [f'M{v}' for v in range(1,14)]},
-        'Aid': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+        'Aid': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
                 'tickvals': [f'C{v}' for v in range(0,6)] + [f'A{v}' for v in range(0,6)]},
-        'Snow': {'send': ['Send', 'Flash'], 'attempt': ['Attempt'],
+        'Snow': {'send': ['Onsight', 'Flash', 'Redpoint', 'Pinkpoint'], 'attempt': ['Fell/Hung', 'N/A'],
                  'tickvals': ['Easy Snow', 'Mod. Snow', 'Steep Snow']}
     }
     config = route_configs[route_type]
@@ -37,6 +37,30 @@ def generate_pyramid(ticks, route_type, rope_type):
     attempt = [a for a in config['attempt'] if a in ticks['Style'].unique()]
     tickvals = config['tickvals']
     
+    # duplicate a row for each value in 'Pitches'
+    def expand_pitches(row):
+        if 'Pitches' in row and pd.notna(row['Pitches']) and row['Pitches'] > 1:
+            return pd.DataFrame([row] * row['Pitches'])
+        else:
+            return pd.DataFrame([row])
+    ticks = pd.concat([expand_pitches(row) for _, row in ticks.iterrows()], ignore_index=True)
+
+    
+    if remove_sent:
+        # if a route has been sent, remove all attempts for that route
+        sent_routes = ticks[ticks['Style'].isin(send)]['Route'].unique()
+        ticks = ticks[~((ticks['Route'].isin(sent_routes)) & (ticks['Style'].isin(attempt)))]
+    if remove_duplicates:
+        # keep only one tick per route per send or attempt
+        # prioritize sends in this order: Onsight, Flash, Redpoint, Pinkpoint, Send
+        style_priority = {style: i for i, style in enumerate(['Onsight', 'Flash', 'Redpoint', 'Pinkpoint', 'Send']) if style in send + attempt}
+        ticks_sends = ticks[ticks['Style'].isin(send)]
+        ticks_sends['Style Priority'] = ticks_sends['Style'].map(style_priority)
+        ticks_sends = ticks_sends.sort_values(by=['Route', 'Style Priority'])
+        ticks_sends = ticks_sends.drop_duplicates(subset=['Route'], keep='first')
+
+        ticks_attempts = ticks[ticks['Style'].isin(attempt)].drop_duplicates(subset=['Route'], keep='first')
+        ticks = pd.concat([ticks_sends, ticks_attempts], ignore_index=True)
     counts = ticks.groupby(['Grade','Style'], observed=False).count().reset_index()
     counts = counts[counts['Style'].isin(send + attempt)]
     counts = counts.pivot(index='Grade',columns='Style',values='Date').reset_index()
@@ -55,8 +79,9 @@ def generate_pyramid(ticks, route_type, rope_type):
     for i, s in enumerate(send):
         hovertemplate += f'  %{{customdata[{i}]}} {s}<br>'
     hovertemplate = hovertemplate[:-4]
+    customdata = np.stack([counts[s] for s in send],axis=-1) if len(send) else None
     fig.add_trace(go.Bar(y=counts['Grade'],x=counts['Top'],orientation='h',
-                         name='Send', customdata=np.stack([counts[s] for s in send],axis=-1),
+                         name='Send', customdata=(np.stack([counts[s] for s in send],axis=-1) if len(send) else None),
                          hovertemplate=hovertemplate))
     hovertemplate = '<b>%{y}</b>: %{customdata[0]} Total'
     fig.add_trace(go.Bar(y=counts['Grade'],x=-counts['attempt'],orientation='h',
