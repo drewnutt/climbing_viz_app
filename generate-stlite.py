@@ -17,7 +17,7 @@ with open('gh_pages/index.html', 'w') as f:
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
-    <title>Stlite app</title>
+    <title>Tick Visualization</title>
   </head>
   <body>
     <div id="root"></div>
