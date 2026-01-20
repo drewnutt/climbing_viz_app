@@ -1,4 +1,5 @@
 # Climbing Pyramid Visualizer
+[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/drewnutt/climbing_viz_app/blob/marimo/marimo_app.py)
 
 ![demo pyramid](demo.png)
 
