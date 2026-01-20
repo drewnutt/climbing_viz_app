@@ -20,6 +20,19 @@ def handle_roped(rope_type, ticks, criteria_send, start_date, end_date, criteria
     if 'Sport, Boulder' in ticks['Route Type'].values:
         ticks = ticks.replace({'Route Type': {'Sport, Boulder': 'Sport'}})
         ticks = ticks.replace({'Lead Style': {'Attempt': 'Fell/Hung'}})
+    def clean_route_type(route_type):
+        if ',' in route_type:
+            if 'Sport' in route_type.split(',')[0]:
+                return 'Sport'
+            elif 'Trad' in route_type.split(',')[0]:
+                return 'Trad'
+            elif 'TR' in route_type.split(',')[0]:
+                return 'TR'
+            else:
+                return route_type.split(',')[0]
+        return route_type
+    ticks['Route Type'] = ticks['Route Type'].apply(clean_route_type)
+
     ticks = ticks.loc[ticks['Route Type'].isin(rope_type), :]
     ticks = filter_time(ticks, start_date, end_date)
     ticks = clean_notes(ticks)
